@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="new_location"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:shortcutShortLabel="@string/short_shortcut_label"
+        android:shortcutLongLabel="@string/long_shortcut_label"
+        android:shortcutDisabledMessage="@string/disabled_shortcut_label">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="de.lumdev.posifinder"
+            android:targetClass="de.lumdev.posifinder.MainActivity">
+            <extra
+                android:name="EXTRA_START_ACTIVITY_IN_BACKGROUND"
+                android:value="EXTRA_START_ACTIVITY_IN_BACKGROUND" />
+        </intent>
+<!--        <intent-->
+<!--            android:action="de.lumdev.posifinder.ACTION_FETCH_LOCATION"-->
+<!--            android:targetPackage="de.lumdev.posifinder"-->
+<!--            android:targetClass="de.lumdev.posifinder.ShortcutIntentService" />-->
+        <!-- If your shortcut is associated with multiple intents, include them
+             here. The last intent in the list determines what the user sees when
+             they launch this shortcut. -->
+        <categories android:name="android.shortcut.conversation" />
+        <capability-binding android:key="actions.intent.CREATE_MESSAGE" />
+    </shortcut>
+    <!-- Specify more shortcuts here. -->
+    <shortcut
+        android:shortcutId="new_location_2"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:shortcutShortLabel="@string/short_shortcut_label_2"
+        android:shortcutLongLabel="@string/long_shortcut_label_2"
+        android:shortcutDisabledMessage="@string/disabled_shortcut_label_2">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="de.lumdev.posifinder"
+            android:targetClass="de.lumdev.posifinder.MainActivity">
+            <extra
+                android:name="EXTRA_START_ACTIVITY_IN_BACKGROUND_2"
+                android:value="EXTRA_START_ACTIVITY_IN_BACKGROUND_2" />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+        <capability-binding android:key="actions.intent.CREATE_MESSAGE" />
+    </shortcut>
+
+</shortcuts>
