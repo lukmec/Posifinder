@@ -106,6 +106,14 @@ class HomeFragment : Fragment() {
             val newFetchMethod = getString(R.string.btn_fetch_method_request_updates)
             fetchMethodOnClickListener(newFetchMethod, sharedPref)
         }
+
+//        binding.buttonStart.setOnClickListener {
+//            Intent(activity?.applicationContext , LocationService::class.java).apply {
+//                action = LocationService.ACTION_START
+//                startService(this)
+//            }
+//        }
+
     }
 
     private fun fetchMethodOnClickListener(newFetchMethod: String, sharedPref: SharedPreferences?){

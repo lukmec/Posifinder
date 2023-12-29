@@ -231,5 +231,22 @@
         app:layout_constraintStart_toEndOf="@+id/button_fetch_method_get_last"
         app:layout_constraintTop_toTopOf="@+id/button_fetch_method_get_last" />
 
+<!--    <Button-->
+<!--        android:id="@+id/buttonStart"-->
+<!--        android:layout_width="0dp"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:layout_marginTop="64dp"-->
+<!--        android:text="Start"-->
+<!--        app:layout_constraintStart_toStartOf="parent"-->
+<!--        app:layout_constraintTop_toBottomOf="@+id/button_fetch_method_get_last" />-->
+
+<!--    <Button-->
+<!--        android:id="@+id/buttonStop"-->
+<!--        android:layout_width="0dp"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:text="Stop"-->
+<!--        app:layout_constraintEnd_toEndOf="parent"-->
+<!--        app:layout_constraintTop_toTopOf="@+id/buttonStart" />-->
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>

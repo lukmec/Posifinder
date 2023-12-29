@@ -1,25 +1,41 @@
 package de.lumdev.posifinder
 
 import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.location.Location
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Menu
 import android.view.MenuItem
+import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Observer
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.NavigationUI.onNavDestinationSelected
 import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.setupActionBarWithNavController
+import androidx.work.OneTimeWorkRequest
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import androidx.work.Worker
+import androidx.work.WorkerParameters
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationAvailability
 import com.google.android.gms.location.LocationCallback
@@ -30,6 +46,7 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.gms.tasks.Task
 import de.lumdev.posifinder.databinding.ActivityMainBinding
+import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -75,6 +92,10 @@ class MainActivity : AppCompatActivity() {
         appBarConfiguration = AppBarConfiguration(navController.graph)
         setupActionBarWithNavController(navController, appBarConfiguration)
 
+        //create Notification Channel
+        val channel = NotificationChannel("location", "location", NotificationManager.IMPORTANCE_DEFAULT)
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
 
         val locationPermissionRequest = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
@@ -100,6 +121,11 @@ class MainActivity : AppCompatActivity() {
         locationPermissionRequest.launch(arrayOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION))
+//        locationPermissionRequest.launch(arrayOf(
+//            Manifest.permission.ACCESS_BACKGROUND_LOCATION))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            backgroundLocationPermission(222)
+        }
 
         if (sharedPref != null) fetchMethod = sharedPref.getString(getString(R.string.pref_id_fetch_method), FETCH_METHOD_DEFAULT).toString()
         fetchType = when (fetchMethod){
@@ -115,7 +141,9 @@ class MainActivity : AppCompatActivity() {
         binding.fab.setOnClickListener { view ->
 //            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
 //                    .setAction("Action", null).show()
-            fetch_location(ui_notifications = (!suppress_ui_notifications), fetchType = fetchType, fetchTypeRetryIfNull = fetchTypeRetryIfNull)
+
+//            fetch_location(ui_notifications = (!suppress_ui_notifications), fetchType = fetchType, fetchTypeRetryIfNull = fetchTypeRetryIfNull)
+            doInBackground()
         }
 
         var activity_starting_method: String = STARTED_NORMALLY
@@ -135,18 +163,32 @@ class MainActivity : AppCompatActivity() {
             moveTaskToBack(true)
         }
 
+//        //set to Background if opening from intent
+//        if (intent.getStringExtra(getString(R.string.EXTRA_START_ACTIVITY_IN_BACKGROUND_2)) == getString(R.string.EXTRA_START_ACTIVITY_IN_BACKGROUND_2)){
+//            activity_starting_method = STARTED_FROM_INTENT_SAVE_POSI_2
+//            println("----------- pls leave activity in foreground -----------")
+////            suppress_ui_notifications = true
+//            fetch_location(ui_notifications = (!suppress_ui_notifications), fetchType = fetchType, fetchTypeRetryIfNull = fetchTypeRetryIfNull)
+//            //invoke service for location fetching
+////            val intentServiceIntent = Intent(this, ShortcutIntentService::class.java)
+////            intentServiceIntent.setAction(ACTION_FETCH_LOCATION)
+////            startService(intentServiceIntent)
+//
+//            //keep activity in foreground (don't move to back!!)
+//        }
+
         //set to Background if opening from intent
         if (intent.getStringExtra(getString(R.string.EXTRA_START_ACTIVITY_IN_BACKGROUND_2)) == getString(R.string.EXTRA_START_ACTIVITY_IN_BACKGROUND_2)){
+            println("LocationForegroundService via Notifcation started on SavePosi2 Shortcut.")
             activity_starting_method = STARTED_FROM_INTENT_SAVE_POSI_2
-            println("----------- pls leave activity in foreground -----------")
-//            suppress_ui_notifications = true
-            fetch_location(ui_notifications = (!suppress_ui_notifications), fetchType = fetchType, fetchTypeRetryIfNull = fetchTypeRetryIfNull)
-            //invoke service for location fetching
-//            val intentServiceIntent = Intent(this, ShortcutIntentService::class.java)
-//            intentServiceIntent.setAction(ACTION_FETCH_LOCATION)
-//            startService(intentServiceIntent)
+            Intent(applicationContext , LocationService::class.java).apply {
+                action = LocationService.ACTION_START
+                startService(this)
+            }
 
-            //keep activity in foreground (don't move to back!!)
+            //move task to background
+            moveTaskToBack(true)
+
         }
 
         //----set starting time depending on starting method-----
@@ -167,6 +209,22 @@ class MainActivity : AppCompatActivity() {
         }
         //write TextView Content depending on sharedPreferences
         //--> in appropriate fragment file
+
+//        findViewById<Button>(R.id.buttonStart).setOnClickListener {
+//            Intent(applicationContext , LocationService::class.java).apply {
+//                action = LocationService.ACTION_START
+//                startService(this)
+//            }
+//            println("LocationService start button pressed.")
+//        }
+//
+//        findViewById<Button>(R.id.buttonStop).setOnClickListener {
+//            Intent(applicationContext , LocationService::class.java).apply {
+//                action = LocationService.ACTION_STOP
+//                startService(this)
+//            }
+//            println("LocationService stop button pressed.")
+//        }
 
     }
 
@@ -379,5 +437,243 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.latitudeTextView).text = lat.toString()
         findViewById<TextView>(R.id.longitudeTextView).text = lon.toString()
         findViewById<TextView>(R.id.titleTextView).text = titleText
+    }
+
+    fun doInBackground(){
+        val request = OneTimeWorkRequest.Builder(FetchLocationWorker::class.java)
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .build()
+
+        WorkManager.getInstance(baseContext)
+            .enqueue(request)
+
+        WorkManager.getInstance(baseContext).getWorkInfoByIdLiveData(request.id)
+            .observe(this, Observer { workInfo ->
+//                DownloadImageWorker.companion.toast(workInfo.state.name, this)
+                // DownloadImageWorker.toast(workInfo.state.name)
+                if (workInfo != null) {
+                    if (workInfo.state == WorkInfo.State.ENQUEUED) {
+                        // Show the work state in text view
+                        println("FetchLocationWorker enqueued.")
+                    } else if (workInfo.state == WorkInfo.State.BLOCKED) {
+                        println("FetchLocationWorker blocked.")
+                    } else if (workInfo.state == WorkInfo.State.RUNNING) {
+                        println("FetchLocationWorker running.")
+                    }
+//                    when (workInfo.state){
+//                        WorkInfo.State.ENQUEUED
+//                    }
+                }
+            })
+    }
+
+    open class FetchLocationWorker(val context: Context, workerParams: WorkerParameters): Worker(context, workerParams) {
+
+//        val context = context
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+
+        override fun doWork(): Result {
+            println("Starting Work from FetchLocationWorker.")
+//            Handler(Looper.getMainLooper()).postDelayed({
+//                println("Finished Work from FetchLocationWorker.")
+//            }, 2000)
+
+            fetch_location(ui_notifications = false, fetchType = fetchType, fetchTypeRetryIfNull = LocationFetchType.NONE)
+
+            println("Finished Work from FetchLocationWorker.")
+            return Result.success()
+        }
+
+        private fun fetch_location(ui_notifications: Boolean, fetchType: LocationFetchType, fetchTypeRetryIfNull: LocationFetchType){
+            println("FetchMethod selected: $fetchMethod")
+            if (ui_notifications) Toast.makeText(context, "Fetching exact location. This may take a little time.", Toast.LENGTH_LONG).show()
+
+            val sharedPref = context.getSharedPreferences(context.getString(R.string.pref_file), Context.MODE_PRIVATE)
+            var lat: Double = 0.0
+            var lon: Double = 0.0
+            var time: Long = 0L
+
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                if (ui_notifications) Toast.makeText(context, "No Location Access granted.", Toast.LENGTH_LONG).show()
+            }else {
+
+                var locationTask: Task<Location>? = null
+                if (fetchType == LocationFetchType.GET_LAST_LOCATION) locationTask = fusedLocationClient.lastLocation
+                else if (fetchType == LocationFetchType.GET_CURRENT_LOCATION) locationTask = fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY,CancellationTokenSource().token)
+                locationTask?.addOnSuccessListener { location: Location? ->
+                    // Got last known location. In some rare situations this can be null
+                    if (location != null) {
+                        val text: String =
+                            "Your Location is: " + location.latitude.toString() + ", " + location.longitude.toString()
+                        println(text)
+                        if (ui_notifications) Toast.makeText(context, text, Toast.LENGTH_LONG).show()
+
+                        lat = location.latitude
+                        lon = location.longitude
+                        time = location.time
+                        //save new location values (to shared preferences and update UI)
+                        if (lat != 0.0 && lon != 0.0 && time != 0L) saveLocation(lat, lon, time)
+
+                    } else {
+                        println("location = null ------------ bad :-(")
+                        //                        if (ui_notifications) Toast.makeText(this, "Fetched Location == NULL", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Fetched Location == NULL", Toast.LENGTH_LONG).show()
+
+                        when (fetchTypeRetryIfNull) {
+                            LocationFetchType.GET_LAST_LOCATION -> fetch_location(
+                                ui_notifications,
+                                fetchTypeRetryIfNull,
+                                LocationFetchType.NONE
+                            )
+
+                            LocationFetchType.GET_CURRENT_LOCATION -> fetch_location(
+                                ui_notifications,
+                                fetchTypeRetryIfNull,
+                                LocationFetchType.NONE
+                            )
+
+                            else -> return@addOnSuccessListener
+                        }
+
+                    }
+                }
+                //end first part of if selection for fetchType
+                if (fetchType == LocationFetchType.REQUEST_LOCATION_UPDATES){
+
+//                println("Go for Requesting Location Updates.")
+
+                    locationCallback = object : LocationCallback() {
+                        override fun onLocationAvailability(availability: LocationAvailability) {
+//                        super.onLocationAvailability(po)
+                            println("Location Availability: ${availability.isLocationAvailable}")
+                        }
+                        override fun onLocationResult(locationResult: LocationResult) {
+//                        println("Inside LocationResult Callback..........")
+//                        for (location in locationResult.locations){
+//                            // Update UI with location data
+//                            // ...
+//                            println("Location from RequestLocationUpdates: ${location.latitude}, ${location.longitude}")
+//                        }
+                            lat = locationResult.lastLocation!!.latitude
+                            lon = locationResult.lastLocation!!.longitude
+                            time = locationResult.lastLocation!!.time
+                            println("Location from RequestLocationUpdates: ${locationResult.lastLocation?.latitude}, ${locationResult.lastLocation?.longitude}")
+                        }
+                    }
+//
+                    println("Starting location updates now.")
+                    startLocationUpdates()
+
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        println("Stopping Location updates now.")
+                        stopLocationUpdates()
+                        //saving obtained values to Preferences and updating UI
+                        println("Final Location from RequestLocationUpdates: $lat, $lon - at $time")
+                        if (lat != 0.0 && lon != 0.0 && time != 0L) saveLocation(lat, lon, time)
+                    }, 20000)
+
+                }
+
+            }
+        }
+
+        private lateinit var locationCallback: LocationCallback
+        private fun startLocationUpdates() {
+            //create location request builder
+            val locationRequest = LocationRequest.Builder(500)
+//                    .setIntervalMillis(10000)
+//                    .setFastestIntervalMillis(5000)
+//                    .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
+                .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
+                .build()
+            //check for location permissions
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED
+            ) { //--> permissions are not granted
+                return
+            }
+            fusedLocationClient.requestLocationUpdates(locationRequest,
+                locationCallback,
+                Looper.getMainLooper())
+        }
+        private fun stopLocationUpdates() {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+        }
+
+        //from https://stackoverflow.com/questions/16319237/cant-put-double-sharedpreferences
+        fun SharedPreferences.Editor.putDouble(key: String, double: Double) =
+            putLong(key, java.lang.Double.doubleToRawLongBits(double))
+        fun SharedPreferences.getDouble(key: String, default: Double) =
+            java.lang.Double.longBitsToDouble(getLong(key, java.lang.Double.doubleToRawLongBits(default)))
+        fun saveLocation (lat: Double, lon: Double, timeStampEpochMillies: Long){
+
+            val sharedPref = context.getSharedPreferences(context.getString(R.string.pref_file), Context.MODE_PRIVATE)
+
+            val instant = Instant.ofEpochMilli(timeStampEpochMillies)
+            val zoneId = ZoneId.systemDefault() // Use the system default time zone
+            val localDateTime = instant.atZone(zoneId).toLocalDateTime()
+            val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy (HH:mm:ss)")
+            val currentDateTime = localDateTime.format(formatter)
+            val titleText = "Position on $currentDateTime"
+
+            //save location values to preferences
+            with(sharedPref.edit()) {
+                putDouble(context.getString(de.lumdev.posifinder.R.string.pref_id_latitude),lat)
+                putDouble(context.getString(de.lumdev.posifinder.R.string.pref_id_longitude),lon)
+                putString(context.getString(de.lumdev.posifinder.R.string.pref_id_title),titleText)
+                apply()
+            }
+            //debug print location values
+            //                            println(sharedPref.getDouble(getString(R.string.pref_id_latitude),10000.0))
+            //                            println(sharedPref.getDouble(getString(R.string.pref_id_longitude),20000.0))
+
+            //write location values to UI
+//            findViewById<TextView>(R.id.latitudeTextView).text = lat.toString()
+//            findViewById<TextView>(R.id.longitudeTextView).text = lon.toString()
+//            findViewById<TextView>(R.id.titleTextView).text = titleText
+        }
+
+    }
+
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun backgroundLocationPermission(backgroundLocationRequestCode: Int) {
+        if (checkPermissionGranted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.background_permission_title)
+            .setMessage(R.string.background_permission)
+            .setPositiveButton(R.string.yes) { _,_ ->
+                // this request will take user to Application's Setting page
+                requestPermissions(arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION), backgroundLocationRequestCode)
+            }
+            .setNegativeButton(R.string.cancel) { dialog,_ ->
+                dialog.dismiss()
+            }
+            .create()
+            .show()
+
+    }
+
+    private fun checkPermissionGranted(permission: String) : Boolean {
+        return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
     }
 }

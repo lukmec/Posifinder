@@ -52,6 +52,11 @@
     <string name="btn_fetch_method_getCurrent">getCurrent()</string>
     <string name="btn_fetch_method_request_updates">requestUpdates()</string>
 
+    <string name="background_permission_title">Set Background Permission</string>
+    <string name="background_permission">Please go to settings and select "Always" as location permission.</string>
+    <string name="yes">yes</string>
+    <string name="cancel">cancel</string>
+
     <!--Shared Preferences Storage IDs-->
     <string name="pref_file" translatable="false">preferences</string>
     <string name="pref_id_latitude" translatable="false">pref_id_latitude</string>
